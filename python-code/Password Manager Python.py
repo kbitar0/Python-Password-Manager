@@ -1,83 +1,69 @@
-from cryptography.fernet import Fernet
 import os
+from cryptography.fernet import Fernet
 
-file = open('passwords.txt','a')
-keyfile = open('key.key','a')
-mkeyfile = open('mkey.key','a')
-file.close()
-keyfile.close()
-mkeyfile.close()
-
-def writekey():
+def write_key(filename):
     key = Fernet.generate_key()
-    with open('key.key','wb') as key_file:
+    with open(filename, 'wb') as key_file:
         key_file.write(key)
 
-def writemasterkey():
-    key = Fernet.generate_key()
-    with open('mkey.key','wb') as key_file:
-        key_file.write(key)
+def retrieve_key(filename):
+    with open(filename, 'rb') as key_file:
+        return key_file.read()
 
-def createpassword():
-    mpassword = input('What would you like your master password to be?  ')
-    with open('passwords.txt','a') as f:
-        f.write(mfer.encrypt(mpassword.encode()).decode() +'\n')
+def create_master_password(mfer):
+    mpassword = input('Set your master password: ')
+    with open('passwords.txt', 'a') as f:
+        f.write(mfer.encrypt(mpassword.encode()).decode() + '\n')
 
-def retrieve_mkey():
-    with open("mkey.key","rb") as r:
-        mkey = r.read()
-    return mkey
+def check_master_password(mfer):
+    with open('passwords.txt', 'r') as f:
+        stored_pass = f.readline().strip()
+    mpass = input("Enter your master password: ")
+    return mfer.decrypt(stored_pass.encode()).decode() == mpass
 
-def retrieve_key():
-    with open("key.key","rb") as r:
-        key = r.read()
-    return key
-
-if os.path.getsize('key.key') == 0:
-    writekey()
-
-if os.path.getsize('mkey.key') == 0:
-    writemasterkey()
-
-mkey = retrieve_mkey()
-mfer = Fernet(mkey)
-
-if os.path.getsize('passwords.txt') == 0:
-    createpassword()
-
-mpass = input("Enter your master password:  ")
-key = retrieve_key() + mpass.encode()
-fer = Fernet(key)
-
-def view():
+def view_passwords(fer):
     with open('passwords.txt', 'r') as f:
         for line in f.readlines()[1:]:
-            info = line.rstrip()
-            user, passw = info.split('|')
+            user, passw = line.rstrip().split('|')
             print(f'User: {user} \nPassword: {fer.decrypt(passw.encode()).decode()} \n')
 
-def new():
-    uname = input('Account username:')
-    password = input('Account password:')
+def add_password(fer):
+    uname = input('Account username: ')
+    password = input('Account password: ')
     with open('passwords.txt', 'a') as f:
         f.write(uname + "|" + fer.encrypt(password.encode()).decode() + "\n")
 
+def main():
+    if not os.path.exists('key.key'):
+        write_key('key.key')
 
-if os.path.getsize('passwords.txt') > 0:
-    with open('passwords.txt','r') as f:
-        lines = f.readlines()
-        x = lines[0]
-    if mpass == mfer.decrypt(x.encode()).decode():
+    if not os.path.exists('mkey.key'):
+        write_key('mkey.key')
+
+    mkey = retrieve_key('mkey.key')
+    mfer = Fernet(mkey)
+
+    if not os.path.exists('passwords.txt') or os.path.getsize('passwords.txt') == 0:
+        create_master_password(mfer)
+
+    if check_master_password(mfer):
+        key = retrieve_key('key.key')
+        mpass = input("Re-enter your master password for verification: ")
+        fer = Fernet(key + mpass.encode())
 
         while True:
-            opt = input('Are you trying to add a new password or view existing ones (Enter either view or new, or type "esc" to leave:  ').lower()
+            opt = input('Choose an action (view/new/esc): ').lower()
             if opt == "esc":
                 break
-            if opt == "view":
-                view()
+            elif opt == "view":
+                view_passwords(fer)
             elif opt == "new":
-                new()
+                add_password(fer)
             else:
                 print('Invalid input.')
     else:
-        print('Incorrect password, program will end.')
+        print('Incorrect master password. Exiting.')
+
+if __name__ == '__main__':
+    main()
+
